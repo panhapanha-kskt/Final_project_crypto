@@ -236,40 +236,18 @@ if __name__ == "__main__":
     iv = os.urandom(16)
 
     print("=== AES-256-CBC JSON Encryption ===")
-    choice = input("Enter '1' to encrypt or '2' to decrypt: ")
+    json_text = input("Enter JSON message:\n> ")
 
-    if choice == '1':
-        print("\nEnter JSON message:")
-        json_text = input("> ")
+    # JSON → Base64
+    b64_json = json_to_base64(json_text)
 
-        # JSON → Base64
-        b64_json = json_to_base64(json_text)
+    # Encrypt
+    ciphertext = aes_cbc_encrypt(b64_json.encode(), key, iv)
 
-        ciphertext = aes_cbc_encrypt(b64_json.encode(), key, iv)
+    # Decrypt to verify
+    decrypted = aes_cbc_decrypt(ciphertext, key, iv)
+    original_json = base64_to_json(decrypted.decode())
 
-        result = {
-            "nonce": to_base64(iv),
-            "ciphertext": to_base64(ciphertext),
-            "key": to_base64(key)
-        }
-
-        print("\nEncrypted Output:")
-        print(json.dumps(result, indent=2))
-
-    elif choice == '2':
-        print("\nPaste encrypted JSON:")
-        encrypted_json = input("> ")
-
-        data = json.loads(encrypted_json)
-
-        iv = from_base64(data['nonce'])
-        key = from_base64(data['key'])
-        ciphertext = from_base64(data['ciphertext'])
-
-        decrypted = aes_cbc_decrypt(ciphertext, key, iv)
-
-        # Base64 → Original JSON
-        original_json = base64_to_json(decrypted.decode())
-
-        print("\nDecrypted JSON:")
-        print(original_json)
+    # Show output like you want
+    print("\n--- RESULTS ---")
+    print(f"Ciphertext (hex): {ciphertext.hex()}")
