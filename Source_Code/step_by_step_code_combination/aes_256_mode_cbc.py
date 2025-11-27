@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from typing import Tuple, List
 import os
 import json
@@ -314,8 +313,7 @@ def decrypt_flow():
 
 
    
-    
-    fname = input("Ciphertext filename [ciphertext.hex]: ").strip() or "ciphertext.hex"
+    fname = "ciphertext.hex"    
     try:
         with open(fname, "r") as f:
             cthex = f.read().strip()
