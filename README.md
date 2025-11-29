@@ -1,19 +1,20 @@
 I. Introduction
 1. Overview of project goal
-Cryptography is the process of converting a normal plaintext to unreadable text in the form of using different algorithms. It can be used for authentication, protecting data from criminal which stands against them by locking the particular data using the key. Cryptography involves: Plaintext, Encryption Algorithm, Ciphertext, Decryption Algorithm, Encryption key and Decryption key. The stronger the cryptographic design, the harder it becomes for attackers to compromise the protected information.
-This project aims to design and implement a Cascade Multi-Layer Encryption Tool, where a single plaintext message is encrypted through four different cryptographic algorithms applied sequentially: ChaCha20-Poly1305, AES-256 in CBC mode, Blowfish in CBC mode, and the classic RC4 stream cipher. Each algorithm adds a new protective layer, similar to an “onion model,” where every layer wraps the previous one. This multi-layer approach increases resistance against brute-force attacks, key recovery attempts, and cryptanalytic techniques, especially when different cipher families are combined.
+     Cryptography is the process of converting a normal plaintext to unreadable text in the form of using different algorithms. It can be used for authentication, protecting data from criminal which stands against them by locking the particular data using the key. Cryptography involves: Plaintext, Encryption Algorithm, Ciphertext, Decryption Algorithm, Encryption key and Decryption key. The stronger the cryptographic design, the harder it becomes for attackers to compromise the protected information.
+     This project aims to design and implement a Cascade Multi-Layer Encryption Tool, where a single plaintext message is encrypted through four different cryptographic algorithms applied sequentially: ChaCha20-Poly1305, AES-256 in CBC mode, Blowfish in CBC mode, and the classic RC4 stream cipher. Each algorithm adds a new protective layer, similar to an “onion model,” where every layer wraps the previous one. This multi-layer approach increases resistance against brute-force attacks, key recovery attempts, and cryptanalytic techniques, especially when different cipher families are combined.
+   
 2. Problem / Solution
-This project addresses several important problems in modern cryptography:
+     This project addresses several important problems in modern cryptography:
 • Single-algorithm dependency
 • Vulnerabilities when one cipher becomes weak
 • Key reuse and predictability issues
 • Risk of brute-force or cryptanalysis
 • Lack of layered security in simple encryption tools
-To solve these issues, the system encrypts data using fount independent keys and four separate cryptographic algorithms. This ensures that even if one layer is compromised, the remaining layers still protect the data. The project also includes support for encoding formats such as Base64 and hexadecimal, allowing ciphertext to be safely transmitted or stored in textual form.
+     To solve these issues, the system encrypts data using fount independent keys and four separate cryptographic algorithms. This ensures that even if one layer is compromised, the remaining layers still protect the data. The project also includes support for encoding formats such as Base64 and hexadecimal, allowing ciphertext to be safely transmitted or stored in textual form.
 3. Motivation
-The motivation for this project is to explore how modern and legacy cryptographic algorithms behave when integrated into one system. Studying these algorithms together helps build a deeper understanding of block ciphers, stream ciphers, authenticated encryption and secure key management.
+     The motivation for this project is to explore how modern and legacy cryptographic algorithms behave when integrated into one system. Studying these algorithms together helps build a deeper understanding of block ciphers, stream ciphers, authenticated encryption and secure key management.
 4. Related Cryptographic Concepts
-This project involves several important cryptographic concepts that are directly reflected in the implementation of the four-layer encryption system:
+     This project involves several important cryptographic concepts that are directly reflected in the implementation of the four-layer encryption system:
 • Symmetric-Key Encryption
 This encryption uses a single shared secret key for both encrypting and decrypting data. This method is known for being fast and efficient, making it ideal for securing large amounts of data.
 • Block Ciphers
