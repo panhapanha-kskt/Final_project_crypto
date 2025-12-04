@@ -11,6 +11,17 @@ from Crypto.Cipher import Blowfish, AES, ChaCha20_Poly1305
 # >>> RC4 ADDED <<<
 from rc4_addingx import AdvancedRC4
 
+# UI Design 
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.box import ROUNDED
+from rich.prompt import Prompt
+from rich.text import Text
+
+
+
+console = Console()
 # ------------------------------------------------------------
 # AES constants for AES-256
 # ------------------------------------------------------------
@@ -384,115 +395,90 @@ def decrypt_message(encrypted_json, key: bytes):
 # ------------------------------------------------------------
 RC4_KEY_FILE = "Source_Code\\all_session\\rc4_key.bin"
 def multilayer_encrypt_flow():
-    """
-    Full multilayer encryption:
-    1. ChaCha20-Poly1305 → JSON output
-    2. JSON → Base64 → AES-256-CBC
-    3. AES output → Blowfish-CBC
-    4. Blowfish → RC4   (ADDED)
-    """
-    print("\nEnter plaintext to encrypt (ChaCha20 → AES → Blowfish → RC4):")
-    txt = input().strip()
+    console.print(Panel("ChaCha20 → AES → Blowfish → RC4", title="[bold cyan]MULTILAYER ENCRYPTION[/bold cyan]", border_style="bright_blue", box=ROUNDED))
+
+    # Input plaintext
+    txt = Prompt.ask("[bold green]Enter plaintext to encrypt[/bold green]").strip()
     if not txt:
-        print("No input provided.")
+        console.print("[bold red]No input provided.[/bold red]")
         return
 
-    print("\nEnter Blowfish key (4-56 bytes):")
-    blowfish_key_input = input().strip().encode()
+    # Input Blowfish key
+    blowfish_key_input = Prompt.ask("[bold yellow]Enter Blowfish key (4–56 bytes)[/bold yellow]").strip().encode()
     if len(blowfish_key_input) < 4 or len(blowfish_key_input) > 56:
-        print("Blowfish key must be between 4 and 56 bytes.")
+        console.print("[bold red]Blowfish key must be between 4 and 56 bytes.[/bold red]")
         return
 
-    # Step 1: ChaCha20
+    # === ORIGINAL ENCRYPTION LOGIC ===
     chacha_json, chacha_key = encrypt_message(txt)
     b64_json = json_to_base64(chacha_json).encode()
 
-    # Step 2: AES
     key = os.urandom(32)
     iv = os.urandom(16)
     ciphertext = aes_cbc_encrypt(b64_json, key, iv)
-
-    # Step 3: Blowfish
     blowfish_ciphertext = blowfish_encrypt(ciphertext, blowfish_key_input)
 
-    # >>> RC4 ADDED HERE <<<
-    print("\nEnter RC4 key:")
-    rc4_key_input = input().strip()
-    # Save files (exact behavior preserved)
-    with open(RC4_KEY_FILE, "wb") as f:
-        encrypt_key = aes_cbc_encrypt(rc4_key_input.encode(), key, iv)
-        f.write(encrypt_key)  # save the encryption of RC4 key
-
-
+    # RC4
+    rc4_key_input = Prompt.ask("[bold magenta]Enter RC4 key[/bold magenta]").strip()
     rc4_tool = AdvancedRC4(rc4_key_input)
     final_ciphertext = rc4_tool.encrypt_decrypt(blowfish_ciphertext)
 
-   
-
+    # Save keys/session
     save_session(SESSION_FILE, key, iv)
-    #Encrypt blowfish bin file
-    encrypt_key = aes_cbc_encrypt(blowfish_key_input, key, iv)
-    save_blowfish_key(BLOWFISH_KEY_FILE, encrypt_key)  
-
+    save_blowfish_key(BLOWFISH_KEY_FILE, aes_cbc_encrypt(blowfish_key_input, key, iv))
+    with open(RC4_KEY_FILE, "wb") as f:
+        f.write(aes_cbc_encrypt(rc4_key_input.encode(), key, iv))
     with open("Source_Code\\all_session\\chacha_key.bin", "wb") as f:
         f.write(chacha_key)
-
-    print("\n--- MULTILAYER ENCRYPTION RESULT ---")
-    print(final_ciphertext.hex())
-
-    with open("Source_Code\\all_session\\ciphertext.hex", "w") as f:
-        f.write(final_ciphertext.hex())
-
     with open("Source_Code\\all_session\\chacha_output.json", "w") as f:
         f.write(chacha_json)
+    with open("Source_Code\\all_session\\ciphertext.hex", "w") as f:
+        f.write(final_ciphertext.hex())
+    # === END ORIGINAL LOGIC ===
+
+    # Display final ciphertext in panel
+    console.print(Panel(Text(final_ciphertext.hex(), style="bold bright_green"),
+                        title="[bold cyan]MULTILAYER ENCRYPTION RESULT[/bold cyan]",
+                        border_style="bright_blue", box=ROUNDED))
+
 
 def multilayer_decrypt_flow():
-    """
-    Full multilayer decryption:
-    1. RC4 → Blowfish
-    2. Blowfish → AES
-    3. AES → Base64 → JSON
-    4. ChaCha20
-    """
+    console.print(Panel("RC4 → Blowfish → AES → ChaCha20", title="[bold cyan]MULTILAYER DECRYPTION[/bold cyan]", border_style="bright_blue", box=ROUNDED))
+
     if not os.path.exists(SESSION_FILE):
-        print(f"ERROR: Session file {SESSION_FILE} not found.")
+        console.print(f"[bold red]ERROR:[/bold red] Session file {SESSION_FILE} not found.")
         return
-    
+
     key, iv = load_session(SESSION_FILE)
 
-    # === DECRYPT THE ENCRYPTED BLOWFISH KEY FILE ===
+    # Decrypt Blowfish key
     try:
         encrypted_bf_key = load_blowfish_key(BLOWFISH_KEY_FILE)
         real_blowfish_key = aes_cbc_decrypt(encrypted_bf_key, key, iv)
     except Exception as e:
-        print("Failed to decrypt Blowfish key file:", e)
+        console.print(f"[bold red]Failed to decrypt Blowfish key file:[/bold red] {e}")
         return
 
-
-    # === DECRYPT THE ENCRYPTED RC4 KEY FILE ===
+    # Decrypt RC4 key
     try:
         encrypted_rc4_key = open(RC4_KEY_FILE, "rb").read()
         real_rc4_key = aes_cbc_decrypt(encrypted_rc4_key, key, iv).decode()
     except Exception as e:
-        print("Failed to decrypt RC4 key file:", e)
+        console.print(f"[bold red]Failed to decrypt RC4 key file:[/bold red] {e}")
         return
-    # === END DECRYPTION OF RC4 KEY FILE ===
 
+    # Load ChaCha key
     try:
         with open("Source_Code\\all_session\\chacha_key.bin", "rb") as f:
             chacha_key = f.read()
     except FileNotFoundError:
-        print("ERROR: chacha_key.bin missing")
+        console.print("[bold red]ERROR:[/bold red] chacha_key.bin missing")
         return
 
-    print("Enter Blowfish key to decrypt:")
     blowfish_key_input = real_blowfish_key
-    if len(blowfish_key_input) < 4 or len(blowfish_key_input) > 56:
-        print("Blowfish key must be between 4 and 56 bytes.")
-        return
 
-    print("Press Enter to use ciphertext.hex or Paste your ciphertext:")
-    user_input = input().strip()
+    # Ciphertext input
+    user_input = Prompt.ask("[bold green]Paste your ciphertext hex (or press Enter to use ciphertext.hex)[/bold green]").strip()
     if user_input:
         cthex = user_input
     else:
@@ -502,48 +488,46 @@ def multilayer_decrypt_flow():
     try:
         final_ciphertext = bytes.fromhex(cthex)
     except:
-        print("Invalid hex.")
+        console.print("[bold red]Invalid hex.[/bold red]")
         return
 
-    # >>> RC4 DECRYPTION ADDED HERE <<<
+    # RC4 decryption
     try:
-        if not os.path.exists(RC4_KEY_FILE):
-            print("Missing rc4_key.bin")
-            return
-        rc4_key = open(RC4_KEY_FILE, "rb").read().decode(errors='ignore')
         rc4_tool = AdvancedRC4(real_rc4_key)
         blowfish_layer = rc4_tool.encrypt_decrypt(final_ciphertext)
     except Exception as e:
-        print("RC4 Decryption failed:", e)
+        console.print(f"[bold red]RC4 Decryption failed:[/bold red] {e}")
         return
 
-    # Step 2: Blowfish decrypt
+    # Blowfish decrypt
     try:
         aes_ciphertext = blowfish_decrypt(blowfish_layer, blowfish_key_input)
     except Exception as e:
-        print("Blowfish Decryption failed:", e)
+        console.print(f"[bold red]Blowfish Decryption failed:[/bold red] {e}")
         return
 
-    # Step 3: AES
+    # AES decrypt
     try:
         decrypted = aes_cbc_decrypt(aes_ciphertext, key, iv)
         chacha_json = base64_to_json(decrypted.decode())
     except Exception as e:
-        print("AES Decryption failed:", e)
+        console.print(f"[bold red]AES Decryption failed:[/bold red] {e}")
         return
 
-    # Step 4: ChaCha20
+    # ChaCha20 decrypt
     try:
         plaintext = decrypt_message(chacha_json, chacha_key)
         if isinstance(plaintext, str) and plaintext.startswith("Decryption failed"):
-            print(plaintext)
+            console.print(f"[bold red]{plaintext}[/bold red]")
             return
     except Exception as e:
-        print("ChaCha20 Decryption failed:", e)
+        console.print(f"[bold red]ChaCha20 Decryption failed:[/bold red] {e}")
         return
 
-    print("\n--- MULTILAYER DECRYPTION RESULT ---")
-    print(plaintext)
+    console.print(Panel(Text(plaintext, style="bold bright_green"),
+                        title="[bold cyan]MULTILAYER DECRYPTION RESULT[/bold cyan]",
+                        border_style="bright_blue", box=ROUNDED))
+    
 
 # ------------------------------------------------------------
 # Entrypoint / Main
