@@ -1,40 +1,359 @@
-I. Introduction
-1. Overview of project goal
-     Cryptography is the process of converting a normal plaintext to unreadable text in the form of using different algorithms. It can be used for authentication, protecting data from criminal which stands against them by locking the particular data using the key. Cryptography involves: Plaintext, Encryption Algorithm, Ciphertext, Decryption Algorithm, Encryption key and Decryption key. The stronger the cryptographic design, the harder it becomes for attackers to compromise the protected information.
-     This project aims to design and implement a Cascade Multi-Layer Encryption Tool, where a single plaintext message is encrypted through four different cryptographic algorithms applied sequentially: ChaCha20-Poly1305, AES-256 in CBC mode, Blowfish in CBC mode, and the classic RC4 stream cipher. Each algorithm adds a new protective layer, similar to an “onion model,” where every layer wraps the previous one. This multi-layer approach increases resistance against brute-force attacks, key recovery attempts, and cryptanalytic techniques, especially when different cipher families are combined.
-   
-2. Problem / Solution
-     This project addresses several important problems in modern cryptography:
-• Single-algorithm dependency
-• Vulnerabilities when one cipher becomes weak
-• Key reuse and predictability issues
-• Risk of brute-force or cryptanalysis
-• Lack of layered security in simple encryption tools
-     To solve these issues, the system encrypts data using fount independent keys and four separate cryptographic algorithms. This ensures that even if one layer is compromised, the remaining layers still protect the data. The project also includes support for encoding formats such as Base64 and hexadecimal, allowing ciphertext to be safely transmitted or stored in textual form.
-3. Motivation
-     The motivation for this project is to explore how modern and legacy cryptographic algorithms behave when integrated into one system. Studying these algorithms together helps build a deeper understanding of block ciphers, stream ciphers, authenticated encryption and secure key management.
-4. Related Cryptographic Concepts
-     This project involves several important cryptographic concepts that are directly reflected in the implementation of the four-layer encryption system:
-• Symmetric-Key Encryption
-This encryption uses a single shared secret key for both encrypting and decrypting data. This method is known for being fast and efficient, making it ideal for securing large amounts of data.
-• Block Ciphers
-This tool uses two block ciphers such as AES-256 in CBC mode, Blowfish in CBC mode.
-• Stream Ciphers
-This cipher is a symmetric encryption method that encrypts data one bit or byte at a time by combining it with a pseudorandom keystream. The keystream generation is used by a pseudorandom number generator (PRNG) to create a long, pseudo-random sequence of bits.
-• Key Scheduling Algorithm
-This is a process used in symmetric encryption to generate a series of unique subkeys (or round keys) from a single original key.
-• Nonces
-o Chacha-Poly1350 requires a unique nonce for every encryption
-o Prevents keystream reuse.
-• Initialization Vectors (IVs) This is a random or pseudorandom value used in cryptography to ensure that identical plaintexts encrypt to different ciphertexts, thereby increasing security. In my concepts require a random IVs to ensure ciphertext uniqueness.
-• Padding Schemes
-o Block ciphers need PKCS7 padding when plaintext is not a full block.
-• Encoding Formats
-o Base64 and Hex encoding are used to represent binary ciphertext in printable string form.
-o Ensures safe storage and transmission over JSON, text files, or networks.
-• Multi-Key Management
-o This tool uses four separate keys, one for each algorithm.
-o Prevents a single key compromise from fully exposing the data.
-• Hybrid Cryptographic Design
-o Combines legacy ciphers (RC4, Blowfish) and modern ciphers (AES-256, ChaCha-Poly1350).
-o Demonstrates practical differences between cipher families and security models.
+🔐 Multi-Layer Encryption Suite
+Final Individual Project – Cryptography
+
+A comprehensive cryptographic demonstration tool featuring a four-layer encryption pipeline, a rich terminal UI, live system/WiFi diagnostics, and a standalone RC4 text encryption utility.
+
+Designed for education, research, and conceptual understanding of layered cryptography.
+
+📘 Purpose of This Tool
+
+This project was developed to help students, researchers, and developers understand:
+
+How different cryptographic algorithms behave in a layered environment
+
+How secure communication concepts are modeled in academic settings
+
+How keys, sessions, and intermediate states are managed
+
+How encryption pipelines are implemented in practice
+
+This tool simulates concepts used in sectors such as secure communication research, defense communication studies, and critical data protection — but is not intended for real-world military or production security.
+
+⚠️ Educational Use Only
+
+This project is intended strictly for:
+
+Learning
+
+Laboratory testing
+
+Simulation
+
+Academic demonstrations
+
+It must not be used to secure real operational, confidential, or military communications.
+
+🚀 Features
+🔹 1. Multi-Layer Encryption Pipeline
+
+The encryption engine applies the following layers sequentially:
+
+ChaCha20-Poly1305
+
+AES-256-CBC
+
+Blowfish-CBC
+
+Advanced RC4 (custom implementation)
+
+Decryption reverses these steps automatically.
+
+🔹 2. Rich Terminal UI (RICH Library)
+
+The UI includes:
+
+Live WiFi and network information
+
+System diagnostics (hostname, IPv4, interface)
+
+Multi-panel layout
+
+Interactive menu
+
+Real-time logs
+
+Encryption/decryption controls
+
+🔹 3. Standalone RC4 CLI Utility
+
+Supports:
+
+Text mode
+
+Hex mode
+
+Python bytes literal (b"\x41\x42...")
+
+Output in: raw, hex, base64, C array (\x00), Python bytes array
+
+File output support via -o
+
+🔹 4. Session & Key Management
+
+Automatically stores:
+
+AES session files
+
+Blowfish keys
+
+ChaCha20 output
+
+RC4 key
+
+Final ciphertext
+
+All of these files are stored in:
+
+Source_Code/all_session/
+
+📁 Project Structure
+D:\YEAR3 TERM1\CRYPTOGRAPHY\FINAL_PROJECT_CRYPTO\SOURCE_CODE
+├── all_session
+│       aes_session.json
+│       blowfish_key.bin
+│       chacha_key.bin
+│       chacha_output.json
+│       ciphertext.hex
+│       rc4_key.bin
+│
+├── FinalCode
+│   │   main.py
+│   │   rc4_addingx.py
+│   │   triple_enc.py
+│   │
+│   └── __pycache__
+│           main.cpython-314.pyc
+│           rc4_addingx.cpython-314.pyc
+│           triple_enc.cpython-314.pyc
+│
+└── step_by_step_code_combination
+        adding_x.py
+        aes_256_mode_cbc.py
+        aes_session.json
+        blowfish.py
+        blowfish_key.bin
+        chacha_key.bin
+        chacha_output.json
+        chacha_poly1305.py
+        ciphertext.hex
+
+⚙️ Installation
+1. Clone the repository
+git clone https://github.com/panhapanha-kskt/Final_project_crypto.git
+cd Final_project_crypto
+
+2. Create virtual environment
+python3 -m venv venv
+
+3. Activate virtual environment
+
+Windows:
+
+venv\Scripts\activate
+
+
+Linux/macOS:
+
+source venv/bin/activate
+
+4. Install dependencies
+cd Source_Code/FinalCode
+pip install -r requirements.txt
+
+▶️ Running the Main Program (Rich UI)
+python3 Source_Code/FinalCode/main.py
+
+
+You will see:
+
+System info
+
+WiFi info
+
+Encryption menu
+
+Logs panel
+
+🧨 Using the Multi-Layer Encryption Tool
+1. Encrypt
+
+Select:
+
+[1] Multilayer Encryption (ChaCha20 → AES → Blowfish → RC4)
+
+
+You will be asked:
+
+Enter plaintext:
+
+
+When done, the tool automatically saves:
+
+Keys
+
+Ciphertext
+
+Intermediate output files
+
+Stored in all_session/.
+
+2. Decrypt
+
+Select:
+
+[2] Multilayer Decryption (RC4 → Blowfish → AES → ChaCha20)
+
+
+The tool loads data from all_session/ and restores the original plaintext.
+
+💡 RC4 Standalone CLI Usage
+Encrypt
+python rc4_addingx.py -m encrypt -k "password123" -i "hello"
+
+Decrypt
+python rc4_addingx.py -m decrypt -k "password123" -i "5a1f9e..."
+
+Supports:
+
+Raw text
+
+Hex strings
+
+Python bytes (b"\x41\x42\x43")
+
+Saving to file (-o output.bin)
+
+📚 Technical Summary
+🔒 Encryption Order (Encrypt Mode)
+Plaintext
+   ↓
+ChaCha20-Poly1305
+   ↓
+AES-256-CBC
+   ↓
+Blowfish-CBC
+   ↓
+Advanced RC4
+   ↓
+ciphertext.hex
+
+🔓 Decryption Order (Decrypt Mode)
+RC4 → Blowfish → AES → ChaCha20
+
+⚠️ Important Notes
+
+✔ Keys and intermediate results are stored automatically
+✔ Do NOT delete all_session/ if you want decryption to work
+✔ RC4 tool is separate from multilayer pipeline
+✔ This project is for education and research only
+
+📊 System Architecture Diagram
+┌───────────────────────────────────────────────────────────┐
+│                  Multi-Layer Encryption Suite              │
+└───────────────────────────────────────────────────────────┘
+
+                 ┌───────────────────────┐
+                 │  Rich UI (main.py)    │
+                 │  - Menu System        │
+                 │  - System Info        │
+                 │  - WiFi Scanner       │
+                 │  - Logs Panel         │
+                 └───────────────▲───────┘
+                                 │ Calls
+                 ┌───────────────┴───────────────┐
+                 │       Encryption Engine        │
+                 │        (triple_enc.py)         │
+                 └───────────────┬───────────────┘
+                                 │
+                    ┌────────────┼─────────────┐
+                    │            │             │
+                    ▼            ▼             ▼
+        ┌────────────────┐  ┌──────────────┐  ┌────────────────┐
+        │ ChaCha20 Layer │  │ AES-256-CBC  │  │ Blowfish-CBC   │
+        └────────────────┘  └──────────────┘  └────────────────┘
+                    │            │             │
+                    └────────────┴─────────────┘
+                                 ▼
+                       ┌──────────────────┐
+                       │   RC4 Layer      │
+                       │ (AdvancedRC4)    │
+                       └──────────────────┘
+                                 │
+                                 ▼
+                      ┌─────────────────────┐
+                      │  Saved Session Data │
+                      │   (all_session/)    │
+                      └─────────────────────┘
+
+🔐 Encryption Flow Diagram
+PLAINTEXT
+   │
+   ▼
+┌────────────────────┐
+│  ChaCha20-Poly1305 │
+└────────────────────┘
+   │
+   ▼
+┌────────────────────┐
+│    AES-256-CBC     │
+└────────────────────┘
+   │
+   ▼
+┌────────────────────┐
+│    Blowfish-CBC    │
+└────────────────────┘
+   │
+   ▼
+┌────────────────────┐
+│        RC4          │
+└────────────────────┘
+   │
+   ▼
+ FINAL HEX CIPHERTEXT
+
+🔓 Decryption Flow Diagram
+CIPHERTEXT
+   │
+   ▼
+┌────────────────────┐
+│        RC4          │
+└────────────────────┘
+   │
+   ▼
+┌────────────────────┐
+│    Blowfish-CBC    │
+└────────────────────┘
+   │
+   ▼
+┌────────────────────┐
+│    AES-256-CBC     │
+└────────────────────┘
+   │
+   ▼
+┌────────────────────┐
+│  ChaCha20-Poly1305 │
+└────────────────────┘
+   │
+   ▼
+PLAINTEXT
+
+🧩 RC4 Standalone Tool Diagram
+INPUT TEXT / HEX / PY BYTES
+        │
+        ▼
+┌───────────────┐
+│  KSA (Keying) │
+└───────────────┘
+        │
+        ▼
+┌───────────────┐
+│ PRGA (Stream) │
+└───────────────┘
+        │
+        ▼
+┌───────────────┐
+│   XOR Stage   │
+└───────────────┘
+        │
+        ▼
+ OUTPUT (hex/raw/base64/etc.)
+
+📂 Session Files Diagram
+all_session/
+│
+├── aes_session.json
+├── blowfish_key.bin
+├── chacha_key.bin
+├── chacha_output.json
+├── ciphertext.hex
+└── rc4_key.bin
