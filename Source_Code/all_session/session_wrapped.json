@@ -1,0 +1,30 @@
+{
+  "salt": "IiSkRrtXi3j+b/DhNN+gvQ==",
+  "wrapped": {
+    "data_aes_key": {
+      "nonce": "uyIyhcYPFSqmCZ7c",
+      "ct": "Qb7BSHj+D71ZdQrIMYHT7DXB1JhHyyZEVHL5542OxkI=",
+      "tag": "KpF0MrS6gAH9zSSP2I2BzA=="
+    },
+    "data_iv": {
+      "nonce": "YuWRkwQR0RCBc9wq",
+      "ct": "SB8QdwiCgnrRCoNuEhOU7Q==",
+      "tag": "ieGhAJF5ED4aq32mkUqfKg=="
+    },
+    "chacha_key": {
+      "nonce": "9Yy1MB2srcRxqVRd",
+      "ct": "gehXu2prpFVxrhXSt9qrUaLGKebSbYHVOHbnu+vJvbw=",
+      "tag": "PC6u3c10/XOVpfqkBwiJKQ=="
+    },
+    "blowfish_key": {
+      "nonce": "ENQ/byQH/jWmJX4A",
+      "ct": "9cXIwByB",
+      "tag": "JyRuyG1by77F7jw0us45Hw=="
+    },
+    "rc4_key": {
+      "nonce": "Irh2wjKLJMqBkJnp",
+      "ct": "zK0oSrnr",
+      "tag": "tpz0v3IwZEt/vWpfcjcxxQ=="
+    }
+  }
+}

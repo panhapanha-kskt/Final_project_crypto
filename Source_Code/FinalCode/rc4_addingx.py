@@ -1,14 +1,15 @@
-import base64
 import argparse
 from getpass import getpass
 
-# ======================================================================
-#                        ADVANCED RC4 ALGORITHM
-# ======================================================================
-
+# -------------------------
+# Advanced RC4 core
+# -------------------------
 class AdvancedRC4:
-    """RC4 encryption/decryption with KSA + PRGA."""
-    
+    """
+    RC4 encryption/decryption using KSA and PRGA.
+    Input key may be str or bytes. Data may be bytes or str.
+    """
+
     def __init__(self, key):
         if isinstance(key, str):
             key = key.encode("utf-8")
@@ -37,6 +38,7 @@ class AdvancedRC4:
         return keystream
 
     def encrypt_decrypt(self, data):
+        """XOR data with keystream. Accepts str or bytes, returns bytes."""
         if isinstance(data, str):
             data = data.encode("utf-8")
 
@@ -46,29 +48,40 @@ class AdvancedRC4:
         return bytes(result)
 
 
-# ======================================================================
-#                        HELPER FUNCTIONS
-# ======================================================================
-
-def bytes_to_c_format(data):
+# -------------------------
+# Helpers: formatting / parsing
+# -------------------------
+def bytes_to_c_format(data: bytes) -> str:
+    """Return C-style \\xhh representation."""
     return "".join(f"\\x{b:02x}" for b in data)
 
-def bytes_to_python_format(data):
+
+def bytes_to_python_format(data: bytes) -> str:
+    """Return Python bytes([...]) literal representation."""
     return "bytes([" + ", ".join(f"0x{b:02x}" for b in data) + "])"
 
-def parse_python_bytes_literal(data):
+
+def parse_python_bytes_literal(data: str) -> bytes:
+    """
+    Parse a Python-like bytes literal beginning with b'...' or b"...".
+    This function decodes escape sequences and returns raw bytes.
+    """
     content = data[2:-1]
     decoded = content.encode("utf-8").decode("unicode_escape")
     return decoded.encode("latin-1")
 
 
-# ======================================================================
-#                           TEXT OPERATION
-# ======================================================================
-
-def process_text(rc4, args):
-    """Handles all text-mode encryption & decryption."""
-
+# -------------------------
+# Text operation (CLI-like)
+# -------------------------
+def process_text(rc4: AdvancedRC4, args):
+    """
+    Handles text-mode encryption & decryption behavior.
+    - Accepts hex input automatically when all characters are hex and length is even.
+    - Accepts Python bytes literal (b'...') format.
+    - For encrypt, prints hex and \\x form.
+    - For decrypt, attempts UTF-8 decode; if fails prints hex.
+    """
     if not args.input:
         args.input = input("[?] Enter text: ")
 
@@ -89,39 +102,38 @@ def process_text(rc4, args):
         try:
             args.input = bytes.fromhex(clean)
             print("[*] Converted hex to bytes")
-        except:
+        except Exception:
+            # keep args.input unchanged if conversion fails
             pass
 
-    # Encrypt
+    # Encrypt mode
     if args.mode == "encrypt":
         result = rc4.encrypt_decrypt(args.input)
         print_output(result, args.output_format, args.output, "encrypt")
         return
 
-    # Decrypt
+    # Decrypt mode
     try:
         encrypted_data = bytes.fromhex(clean)
-    except:
+    except Exception:
         encrypted_data = args.input.encode("utf-8")
 
     result = rc4.encrypt_decrypt(encrypted_data)
     print_output(result, args.output_format, args.output, "decrypt")
 
 
-# ======================================================================
-#                           OUTPUT HANDLING
-# ======================================================================
-
-def print_output(data, format_type, output_file, mode):
-    """Pretty output for encryption/decryption results."""
-
+# -------------------------
+# Output formatting & saving
+# -------------------------
+def print_output(data: bytes, format_type: str, output_file: str, mode: str):
+    """Print results (friendly) and optionally save to file."""
     if mode == "encrypt":
         print("Encrypted (hex):", data.hex())
         print("Encrypted (\\x):", bytes_to_c_format(data))
     else:
         try:
             print("Decrypted text:", data.decode("utf-8"))
-        except:
+        except Exception:
             print("Decrypted (hex):", data.hex())
 
     if output_file:
@@ -130,10 +142,9 @@ def print_output(data, format_type, output_file, mode):
         print(f"Saved to {output_file}")
 
 
-# ======================================================================
-#                                MAIN
-# ======================================================================
-
+# -------------------------
+# CLI-style main (if run standalone)
+# -------------------------
 def main():
     parser = argparse.ArgumentParser(description="RC4 Text Encryption Tool")
     parser.add_argument("-m", "--mode", required=True, choices=["encrypt", "decrypt"])
@@ -153,4 +164,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-# ======================================================================

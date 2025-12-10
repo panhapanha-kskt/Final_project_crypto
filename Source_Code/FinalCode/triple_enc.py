@@ -1,555 +1,356 @@
-import json
+# triple_enc.py
+"""
+Secure multilayer encryption flow (patched).
+
+Replaces custom AES implementation with PyCryptodome AES (CBC for data,
+AES-GCM for key-wrapping) and uses PBKDF2 for deriving a wrapping key from
+a user passphrase. Fixes blowfish key storage, RC4 key storage, and avoids
+saving ChaCha20 key in plaintext.
+
+Flow (Encrypt):
+ 1) ChaCha20-Poly1305 -> JSON (nonce,header,ciphertext,tag)
+ 2) Base64(JSON) -> AES-256-CBC (random data_key + iv)  (data encryption)
+ 3) Blowfish-CBC encrypt AES ciphertext using blowfish key (user-provided)
+ 4) RC4 encrypt Blowfish ciphertext using RC4 key (user-provided)
+ 5) Save wrapped keys (wrapped with AES-GCM using a key derived from passphrase)
+
+Flow (Decrypt):
+ Reverse the above using the passphrase to unwrap keys.
+
+Notes:
+ - Requires PyCryptodome: pip install pycryptodome
+ - Session file contains: salt + wrapped blobs (base64 JSON)
+"""
+
 import os
-import sys
+import json
 import base64
 from base64 import b64encode, b64decode
-from typing import Tuple, List
+from typing import Tuple
 
+from getpass import getpass
 from Crypto.Random import get_random_bytes
-from Crypto.Cipher import Blowfish, AES, ChaCha20_Poly1305
+from Crypto.Cipher import Blowfish, AES as PyAES, ChaCha20_Poly1305
+from Crypto.Protocol.KDF import PBKDF2
 
-# >>> RC4 ADDED <<<
-from rc4_addingx import AdvancedRC4
-
-# UI Design 
+# Rich is optional but used in the UI flows (keeps your UI style)
 from rich.console import Console
 from rich.panel import Panel
-from rich.table import Table
-from rich.box import ROUNDED
 from rich.prompt import Prompt
 from rich.text import Text
-
-
+from rich.box import ROUNDED
 
 console = Console()
-# ------------------------------------------------------------
-# AES constants for AES-256
-# ------------------------------------------------------------
-Nb = 4
-Nk = 8  # AES-256
-Nr = 14
 
-# ------------------------------------------------------------
-# S-Box + inverse
-# ------------------------------------------------------------
-s_box = [
-    [0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76],
-    [0xca,0x82,0xc9,0x7d,0xfa,0x59,0x47,0xf0,0xad,0xd4,0xa2,0xaf,0x9c,0xa4,0x72,0xc0],
-    [0xb7,0xfd,0x93,0x26,0x36,0x3f,0xf7,0xcc,0x34,0xa5,0xe5,0xf1,0x71,0xd8,0x31,0x15],
-    [0x04,0xc7,0x23,0xc3,0x18,0x96,0x05,0x9a,0x07,0x12,0x80,0xe2,0xeb,0x27,0xb2,0x75],
-    [0x09,0x83,0x2c,0x1a,0x1b,0x6e,0x5a,0xa0,0x52,0x3b,0xd6,0xb3,0x29,0xe3,0x2f,0x84],
-    [0x53,0xd1,0x00,0xed,0x20,0xfc,0xb1,0x5b,0x6a,0xcb,0xbe,0x39,0x4a,0x4c,0x58,0xcf],
-    [0xd0,0xef,0xaa,0xfb,0x43,0x4d,0x33,0x85,0x45,0xf9,0x02,0x7f,0x50,0x3c,0x9f,0xa8],
-    [0x51,0xa3,0x40,0x8f,0x92,0x9d,0x38,0xf5,0xbc,0xb6,0xda,0x21,0x10,0xff,0xf3,0xd2],
-    [0xcd,0x0c,0x13,0xec,0x5f,0x97,0x44,0x17,0xc4,0xa7,0x7e,0x3d,0x64,0x5d,0x19,0x73],
-    [0x60,0x81,0x4f,0xdc,0x22,0x2a,0x90,0x88,0x46,0xee,0xb8,0x14,0xde,0x5e,0x0b,0xdb],
-    [0xe0,0x32,0x3a,0x0a,0x49,0x06,0x24,0x5c,0xc2,0xd3,0xac,0x62,0x91,0x95,0xe4,0x79],
-    [0xe7,0xc8,0x37,0x6d,0x8d,0xd5,0x4e,0xa9,0x6c,0x56,0xf4,0xea,0x65,0x7a,0xae,0x08],
-    [0xba,0x78,0x25,0x2e,0x1c,0xa6,0xb4,0xc6,0xe8,0xdd,0x74,0x1f,0x4b,0xbd,0x8b,0x8a],
-    [0x70,0x3e,0xb5,0x66,0x48,0x03,0xf6,0x0e,0x61,0x35,0x57,0xb9,0x86,0xc1,0x1d,0x9e],
-    [0xe1,0xf8,0x98,0x11,0x69,0xd9,0x8e,0x94,0x9b,0x1e,0x87,0xe9,0xce,0x55,0x28,0xdf],
-    [0x8c,0xa1,0x89,0x0d,0xbf,0xe6,0x42,0x68,0x41,0x99,0x2d,0x0f,0xb0,0x54,0xbb,0x16]
-]
+# Constants for PBKDF2
+PBKDF2_ITERATIONS = 200_000
+PBKDF2_KEY_LEN = 32  # 256-bit wrapping key
+PBKDF2_SALT_LEN = 16
 
-inv_s_box = [[0]*16 for _ in range(16)]
-for i in range(16):
-    for j in range(16):
-        inv_s_box[s_box[i][j] >> 4][s_box[i][j] & 0x0F] = (i << 4) | j
+# Session file path (same folder structure you used)
+SESSION_FILE = "Source_Code\\all_session\\session_wrapped.json"
+CIPHERTEXT_FILE = "Source_Code\\all_session\\ciphertext.hex"
 
-# ------------------------------------------------------------
-# Utility (GF, state conversions)
-# ------------------------------------------------------------
-def xtime(a: int) -> int:
-    return ((a << 1) ^ 0x1b) & 0xff if a & 0x80 else (a << 1)
-
-def gf_mul(a: int, b: int) -> int:
-    res = 0
-    for _ in range(8):
-        if b & 1:
-            res ^= a
-        a = xtime(a)
-        b >>= 1
-    return res & 0xFF
-
-def state_from_bytes(block: bytes) -> List[List[int]]:
-    return [list(block[i::4]) for i in range(4)]
-
-def bytes_from_state(state: List[List[int]]) -> bytes:
-    return bytes(state[row][col] for col in range(4) for row in range(4))
-
-# ------------------------------------------------------------
-# AES round functions
-# ------------------------------------------------------------
-def sub_bytes(state):
-    for c in range(4):
-        for r in range(4):
-            v = state[c][r]
-            state[c][r] = s_box[v >> 4][v & 0x0F]
-
-def inv_sub_bytes(state):
-    for c in range(4):
-        for r in range(4):
-            v = state[c][r]
-            state[c][r] = inv_s_box[v >> 4][v & 0x0F]
-
-def shift_rows(state):
-    for r in range(1, 4):
-        row = [state[c][r] for c in range(4)]
-        row = row[r:] + row[:r]
-        for c in range(4):
-            state[c][r] = row[c]
-
-def inv_shift_rows(state):
-    for r in range(1, 4):
-        row = [state[c][r] for c in range(4)]
-        row = row[-r:] + row[:-r]
-        for c in range(4):
-            state[c][r] = row[c]
-
-def mix_columns(state):
-    for c in range(4):
-        a = state[c]
-        state[c] = [
-            gf_mul(a[0],2) ^ gf_mul(a[1],3) ^ a[2] ^ a[3],
-            a[0] ^ gf_mul(a[1],2) ^ gf_mul(a[2],3) ^ a[3],
-            a[0] ^ a[1] ^ gf_mul(a[2],2) ^ gf_mul(a[3],3),
-            gf_mul(a[0],3) ^ a[1] ^ a[2] ^ gf_mul(a[3],2),
-        ]
-
-def inv_mix_columns(state):
-    for c in range(4):
-        a = state[c]
-        state[c] = [
-            gf_mul(a[0],14) ^ gf_mul(a[1],11) ^ gf_mul(a[2],13) ^ gf_mul(a[3],9),
-            gf_mul(a[0],9)  ^ gf_mul(a[1],14) ^ gf_mul(a[2],11) ^ gf_mul(a[3],13),
-            gf_mul(a[0],13) ^ gf_mul(a[1],9)  ^ gf_mul(a[2],14) ^ gf_mul(a[3],11),
-            gf_mul(a[0],11) ^ gf_mul(a[1],13) ^ gf_mul(a[2],9)  ^ gf_mul(a[3],14),
-        ]
-
-def add_round_key(state, round_key):
-    for c in range(4):
-        for r in range(4):
-            state[c][r] ^= round_key[c][r]
-
-# ------------------------------------------------------------
-# Key expansion (AES-256)
-# ------------------------------------------------------------
-Rcon = [0x00,0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80,0x1B,0x36]
-
-def expand_key(key: bytes) -> List[List[List[int]]]:
-    words = [list(key[i:i+4]) for i in range(0, 32, 4)]
-    for i in range(Nk, Nb * (Nr + 1)):
-        temp = words[i - 1].copy()
-        if i % Nk == 0:
-            temp = temp[1:] + temp[:1]
-            temp = [s_box[b >> 4][b & 0x0F] for b in temp]
-            temp[0] ^= Rcon[i // Nk]
-        elif i % Nk == 4:
-            temp = [s_box[b >> 4][b & 0x0F] for b in temp]
-        words.append([(words[i - Nk][j] ^ temp[j]) & 0xFF for j in range(4)])
-
-    round_keys = []
-    for r in range(Nr + 1):
-        start = r * 4
-        key_state = [[words[start + c][r2] for r2 in range(4)] for c in range(4)]
-        round_keys.append(key_state)
-    return round_keys
-
-# ------------------------------------------------------------
-# Block encrypt/decrypt
-# ------------------------------------------------------------
-def encrypt_block(block: bytes, round_keys):
-    state = state_from_bytes(block)
-    add_round_key(state, round_keys[0])
-
-    for rnd in range(1, Nr):
-        sub_bytes(state)
-        shift_rows(state)
-        mix_columns(state)
-        add_round_key(state, round_keys[rnd])
-
-    sub_bytes(state)
-    shift_rows(state)
-    add_round_key(state, round_keys[Nr])
-    return bytes_from_state(state)
-
-def decrypt_block(block: bytes, round_keys):
-    state = state_from_bytes(block)
-    add_round_key(state, round_keys[Nr])
-    inv_shift_rows(state)
-    inv_sub_bytes(state)
-
-    for rnd in range(Nr - 1, 0, -1):
-        add_round_key(state, round_keys[rnd])
-        inv_mix_columns(state)
-        inv_shift_rows(state)
-        inv_sub_bytes(state)
-
-    add_round_key(state, round_keys[0])
-    return bytes_from_state(state)
+# RC4 engine (kept from your rc4_addingx module)
+from rc4_addingx import AdvancedRC4
 
 
-# ------------------------------------------------------------
-# CBC mode and padding
-# ------------------------------------------------------------
-def pad(data: bytes) -> bytes:
-    pad_len = 16 - (len(data) % 16)
+# ---------------------------
+# Helpers: PKCS7 padding for AES-CBC
+# ---------------------------
+def pkcs7_pad(data: bytes, block_size: int = 16) -> bytes:
+    pad_len = block_size - (len(data) % block_size)
     return data + bytes([pad_len]) * pad_len
 
-def unpad(data: bytes) -> bytes:
+
+def pkcs7_unpad(data: bytes) -> bytes:
     if not data:
-        raise ValueError("Empty data in unpad")
+        raise ValueError("Invalid PKCS7 padding (empty input)")
     pad_len = data[-1]
     if pad_len < 1 or pad_len > 16:
-        raise ValueError("Invalid padding length")
+        raise ValueError("Invalid PKCS7 padding length")
     if data[-pad_len:] != bytes([pad_len]) * pad_len:
-        raise ValueError("Invalid padding bytes")
+        raise ValueError("Invalid PKCS7 padding bytes")
     return data[:-pad_len]
 
-def aes_cbc_encrypt(data: bytes, key: bytes, iv: bytes) -> bytes:
-    data = pad(data)
-    rk = expand_key(key)
-    out = b""
-    prev = iv
-    for i in range(0, len(data), 16):
-        block = bytes([data[i+j] ^ prev[j] for j in range(16)])
-        c = encrypt_block(block, rk)
-        out += c
-        prev = c
-    return out
 
-def aes_cbc_decrypt(data: bytes, key: bytes, iv: bytes) -> bytes:
-    if len(data) % 16 != 0:
-        raise ValueError("Ciphertext length must be multiple of 16")
-    rk = expand_key(key)
-    out = b""
-    prev = iv
-    for i in range(0, len(data), 16):
-        d = decrypt_block(data[i:i+16], rk)
-        out += bytes([d[j] ^ prev[j] for j in range(16)])
-        prev = data[i:i+16]
-    return unpad(out)
+# ---------------------------
+# AES-CBC encryption (data)
+# ---------------------------
+def aes_cbc_encrypt(plaintext: bytes, key: bytes, iv: bytes) -> bytes:
+    cipher = PyAES.new(key, PyAES.MODE_CBC, iv)
+    pt = pkcs7_pad(plaintext, 16)
+    return cipher.encrypt(pt)
 
-# ------------------------------------------------------------
-# Blowfish Encryption/Decryption
-# ------------------------------------------------------------
-def blowfish_encrypt(data: bytes, key: bytes) -> bytes:
-    bs = Blowfish.block_size
-    cipher = Blowfish.new(key, Blowfish.MODE_CBC)
-    plen = bs - len(data) % bs
-    padding = bytes([plen] * plen)
-    encrypted = cipher.iv + cipher.encrypt(data + padding)
-    return encrypted
 
-def blowfish_decrypt(data: bytes, key: bytes) -> bytes:
-    bs = Blowfish.block_size
-    if len(data) < bs:
-        raise ValueError("Ciphertext too short")
-    iv = data[:bs]
-    cipher_data = data[bs:]
-    decipher = Blowfish.new(key, Blowfish.MODE_CBC, iv)
-    decrypted = decipher.decrypt(cipher_data)
-    padding_length = decrypted[-1]
-    return decrypted[:-padding_length]
+def aes_cbc_decrypt(ciphertext: bytes, key: bytes, iv: bytes) -> bytes:
+    if len(ciphertext) % 16 != 0:
+        raise ValueError("Ciphertext length must be multiple of AES block size")
+    cipher = PyAES.new(key, PyAES.MODE_CBC, iv)
+    pt = cipher.decrypt(ciphertext)
+    return pkcs7_unpad(pt)
 
-# ------------------------------------------------------------
-# JSON <-> Base64 helpers
-# ------------------------------------------------------------
-def json_to_base64(json_text: str) -> str:
-    return base64.b64encode(json_text.encode()).decode()
 
-def base64_to_json(b64: str) -> str:
-    return base64.b64decode(b64.encode()).decode()
+# ---------------------------
+# Key wrapping with AES-GCM
+# ---------------------------
+def derive_wrapping_key(passphrase: str, salt: bytes) -> bytes:
+    # Use PBKDF2 to derive a symmetric key to wrap keys
+    return PBKDF2(passphrase.encode("utf-8"), salt, dkLen=PBKDF2_KEY_LEN, count=PBKDF2_ITERATIONS)
 
-# ------------------------------------------------------------
-# Session persistence helpers
-# ------------------------------------------------------------
-SESSION_FILE = "Source_Code\\all_session\\aes_session.json"
-BLOWFISH_KEY_FILE = "Source_Code\\all_session\\blowfish_key.bin"
 
-def save_session(filename: str, key: bytes, iv: bytes):
-    with open(filename, "w") as f:
-        json.dump({"key": key.hex(), "iv": iv.hex()}, f)
+def wrap_with_aes_gcm(wrap_key: bytes, plaintext: bytes) -> dict:
+    # Returns dict with nonce, ciphertext, tag (all base64 encoded)
+    nonce = get_random_bytes(12)
+    cipher = PyAES.new(wrap_key, PyAES.MODE_GCM, nonce=nonce)
+    ct, tag = cipher.encrypt_and_digest(plaintext)
+    return {"nonce": b64encode(nonce).decode(), "ct": b64encode(ct).decode(), "tag": b64encode(tag).decode()}
 
-def load_session(filename: str) -> Tuple[bytes, bytes]:
-    with open(filename, "r") as f:
-        d = json.load(f)
-    return bytes.fromhex(d["key"]), bytes.fromhex(d["iv"])
 
-def save_blowfish_key(filename: str, key: bytes):
-    with open(filename, "wb") as f:
-        f.write(key)
+def unwrap_with_aes_gcm(wrap_key: bytes, wrapped: dict) -> bytes:
+    nonce = b64decode(wrapped["nonce"])
+    ct = b64decode(wrapped["ct"])
+    tag = b64decode(wrapped["tag"])
+    cipher = PyAES.new(wrap_key, PyAES.MODE_GCM, nonce=nonce)
+    return cipher.decrypt_and_verify(ct, tag)
 
-def load_blowfish_key(filename: str) -> bytes:
-    with open(filename, "rb") as f:
-        return f.read()
 
-# ------------------------------------------------------------
-# CLI behavior and helper functions for ChaCha20 layer
-# ------------------------------------------------------------
-def encrypt_flow():
-    print("\nEnter JSON message (single line):")
-    txt = input().strip()
-    if not txt:
-        print("No input provided.")
-        return
+# ---------------------------
+# ChaCha20 helpers (unchanged logic, but keys protected)
+# ---------------------------
+def encrypt_message_chacha(plaintext: bytes, header: bytes = b"header") -> Tuple[str, bytes]:
+    cipher = ChaCha20_Poly1305.new(key=get_random_bytes(32))
+    cipher.update(header)
+    ciphertext, tag = cipher.encrypt_and_digest(plaintext)
+    result = {
+        "nonce": b64encode(cipher.nonce).decode(),
+        "header": b64encode(header).decode(),
+        "ciphertext": b64encode(ciphertext).decode(),
+        "tag": b64encode(tag).decode(),
+    }
+    return json.dumps(result, indent=2), b64decode(b64encode(cipher.nonce + ciphertext + tag))  # not used but kept minimal
 
-    try:
-        json.loads(txt)
-    except Exception:
-        print("Warning: input is not valid JSON. Proceeding anyway.")
 
-    b64_json = json_to_base64(txt).encode()
-    key = os.urandom(32)
-    iv = os.urandom(16)
-    ciphertext = aes_cbc_encrypt(b64_json, key, iv)
-    save_session(SESSION_FILE, key, iv)
-
-    print("\n--- ENCRYPTION RESULT ---")
-    print("Ciphertext (hex):")
-    print(ciphertext.hex())
-
-    with open("Source_Code\\all_session\\ciphertext.hex", "w") as f:
-        f.write(ciphertext.hex())
-
-def decrypt_flow():
-    if not os.path.exists(SESSION_FILE):
-        print(f"ERROR: Session file {SESSION_FILE} not found.")
-        print("You must encrypt first to generate key & IV.")
-        return
-
-    key, iv = load_session(SESSION_FILE)
-
-    cthex = input("Enter ciphertext (hex): ").strip()
-    try:
-        ciphertext = bytes.fromhex(cthex)
-    except Exception:
-        print("Ciphertext is not valid hex.")
-        return
-
-    try:
-        decrypted = aes_cbc_decrypt(ciphertext, key, iv)
-        original_json = base64_to_json(decrypted.decode())
-        print("\n--- DECRYPTION RESULT ---")
-        print(original_json)
-    except Exception as e:
-        print("Decryption failed:", e)
-
-    fname = "ciphertext.hex"
-    try:
-        with open(fname, "r") as f:
-            cthex = f.read().strip()
-    except Exception as e:
-        print(f"Failed to read {fname}: {e}")
-        return
-
-    try:
-        ciphertext = bytes.fromhex(cthex)
-    except Exception as e:
-        print("Ciphertext is not valid hex.")
-        return
-
-    try:
-        decrypted = aes_cbc_decrypt(ciphertext, key, iv)
-        original_json = base64_to_json(decrypted.decode())
-        print("\n--- DECRYPTION RESULT ---")
-        print(original_json)
-    except Exception as e:
-        print("Decryption failed:", e)
-
-# ------------------------------------------------------------
-# ChaCha20 message helper functions
-# ------------------------------------------------------------
-def encrypt_message(plaintext, header=b"header"):
-    if isinstance(plaintext, str):
-        plaintext = plaintext.encode('utf-8')
-    if isinstance(header, str):
-        header = header.encode('utf-8')
-
-    key = get_random_bytes(32)
+def encrypt_message_chacha_with_key(plaintext: bytes, header: bytes, key: bytes) -> Tuple[str, bytes]:
     cipher = ChaCha20_Poly1305.new(key=key)
     cipher.update(header)
     ciphertext, tag = cipher.encrypt_and_digest(plaintext)
+    result = {
+        "nonce": b64encode(cipher.nonce).decode(),
+        "header": b64encode(header).decode(),
+        "ciphertext": b64encode(ciphertext).decode(),
+        "tag": b64encode(tag).decode(),
+    }
+    return json.dumps(result, indent=2), key
 
-    jk = ['nonce', 'header', 'ciphertext', 'tag']
-    jv = [b64encode(x).decode('utf-8') for x in (cipher.nonce, header, ciphertext, tag)]
-    result = json.dumps(dict(zip(jk, jv)), indent=2)
-    return result, key
 
-def decrypt_message(encrypted_json, key: bytes):
-    try:
-        data = json.loads(encrypted_json)
-        nonce = b64decode(data['nonce'])
-        header = b64decode(data['header'])
-        ciphertext = b64decode(data['ciphertext'])
-        tag = b64decode(data['tag'])
-        cipher = ChaCha20_Poly1305.new(key=key, nonce=nonce)
-        cipher.update(header)
-        plaintext = cipher.decrypt_and_verify(ciphertext, tag)
-        return plaintext.decode('utf-8')
-    except Exception as e:
-        return f"Decryption failed: {str(e)}"
+def decrypt_message_chacha(encrypted_json: str, key: bytes) -> str:
+    data = json.loads(encrypted_json)
+    nonce = b64decode(data["nonce"])
+    header = b64decode(data["header"])
+    ciphertext = b64decode(data["ciphertext"])
+    tag = b64decode(data["tag"])
+    cipher = ChaCha20_Poly1305.new(key=key, nonce=nonce)
+    cipher.update(header)
+    plaintext = cipher.decrypt_and_verify(ciphertext, tag)
+    return plaintext.decode("utf-8")
 
-# ------------------------------------------------------------
-# Multilayer pipeline: encrypt / decrypt flows
-# ------------------------------------------------------------
-RC4_KEY_FILE = "Source_Code\\all_session\\rc4_key.bin"
+
+# ---------------------------
+# Blowfish wrappers (unchanged except no key mangling)
+# ---------------------------
+def blowfish_encrypt_full(data: bytes, key: bytes) -> bytes:
+    # Uses PKCS#7 style padding specific to block size (Blowfish.block_size)
+    bs = Blowfish.block_size
+    cipher = Blowfish.new(key, Blowfish.MODE_CBC)
+    padding_len = bs - (len(data) % bs)
+    data_padded = data + bytes([padding_len]) * padding_len
+    return cipher.iv + cipher.encrypt(data_padded)
+
+
+def blowfish_decrypt_full(data: bytes, key: bytes) -> bytes:
+    bs = Blowfish.block_size
+    if len(data) < bs:
+        raise ValueError("Ciphertext too short for Blowfish")
+    iv = data[:bs]
+    ct = data[bs:]
+    cipher = Blowfish.new(key, Blowfish.MODE_CBC, iv=iv)
+    pt_padded = cipher.decrypt(ct)
+    pad_len = pt_padded[-1]
+    return pt_padded[:-pad_len]
+
+
+# ---------------------------
+# Multilayer encrypt/decrypt flows with secure wrapping
+# ---------------------------
 def multilayer_encrypt_flow():
-    console.print(Panel("ChaCha20 → AES → Blowfish → RC4", title="[bold cyan]MULTILAYER ENCRYPTION[/bold cyan]", border_style="bright_blue", box=ROUNDED))
+    console.print(Panel("ChaCha20 → AES-CBC → Blowfish → RC4 (secure patch)", title="[bold cyan]MULTILAYER ENCRYPTION[/bold cyan]", border_style="bright_blue", box=ROUNDED))
 
-    # Input plaintext
-    txt = Prompt.ask("[bold green]Enter plaintext to encrypt[/bold green]").strip()
+    txt = Prompt.ask("[bold green]Enter plaintext to encrypt[/bold green]")
     if not txt:
         console.print("[bold red]No input provided.[/bold red]")
         return
 
-    # Input Blowfish key
-    blowfish_key_input = Prompt.ask("[bold yellow]Enter Blowfish key (4–56 bytes)[/bold yellow]").strip().encode()
+    # Blowfish key provided by user (text)
+    blowfish_key_input = Prompt.ask("[bold yellow]Enter Blowfish key (4–56 bytes)[/bold yellow]").encode("utf-8")
     if len(blowfish_key_input) < 4 or len(blowfish_key_input) > 56:
         console.print("[bold red]Blowfish key must be between 4 and 56 bytes.[/bold red]")
         return
 
-    # === ORIGINAL ENCRYPTION LOGIC ===
-    chacha_json, chacha_key = encrypt_message(txt)
-    b64_json = json_to_base64(chacha_json).encode()
+    # RC4 key provided by user
+    rc4_key_input = Prompt.ask("[bold magenta]Enter RC4 key (min 5 bytes)[/bold magenta]").strip().encode("utf-8")
+    if len(rc4_key_input) < 5:
+        console.print("[bold red]RC4 key must be at least 5 bytes.[/bold red]")
+        return
 
-    key = os.urandom(32)
-    iv = os.urandom(16)
-    ciphertext = aes_cbc_encrypt(b64_json, key, iv)
-    blowfish_ciphertext = blowfish_encrypt(ciphertext, blowfish_key_input)
+    # Ask for passphrase that will protect stored session keys (mandatory)
+    console.print("[bold cyan]You will be asked to choose a passphrase to protect stored session keys.[/bold cyan]")
+    passphrase = getpass("[?] Enter passphrase for session storage: ").strip()
+    if not passphrase:
+        console.print("[bold red]Passphrase is required to securely store keys.[/bold red]")
+        return
 
-    # RC4
-    rc4_key_input = Prompt.ask("[bold magenta]Enter RC4 key[/bold magenta]").strip()
-    rc4_tool = AdvancedRC4(rc4_key_input)
-    final_ciphertext = rc4_tool.encrypt_decrypt(blowfish_ciphertext)
+    # 1) ChaCha20-Poly1305
+    header = b"multilayer"
+    chacha_key = get_random_bytes(32)
+    chacha_json, _ = encrypt_message_chacha_with_key(txt.encode("utf-8"), header, chacha_key)
 
-    # Save keys/session
-    save_session(SESSION_FILE, key, iv)
-    save_blowfish_key(BLOWFISH_KEY_FILE, aes_cbc_encrypt(blowfish_key_input, key, iv))
-    with open(RC4_KEY_FILE, "wb") as f:
-        f.write(aes_cbc_encrypt(rc4_key_input.encode(), key, iv))
-    with open("Source_Code\\all_session\\chacha_key.bin", "wb") as f:
-        f.write(chacha_key)
-    with open("Source_Code\\all_session\\chacha_output.json", "w") as f:
-        f.write(chacha_json)
-    with open("Source_Code\\all_session\\ciphertext.hex", "w") as f:
+    # 2) AES (random key + IV) for data encryption
+    data_aes_key = get_random_bytes(32)  # AES-256
+    data_iv = get_random_bytes(16)
+    b64_json = b64encode(chacha_json.encode("utf-8"))
+    aes_ciphertext = aes_cbc_encrypt(b64_json, data_aes_key, data_iv)
+
+    # 3) Blowfish encrypt AES ciphertext
+    blowfish_ciphertext = blowfish_encrypt_full(aes_ciphertext, blowfish_key_input)
+
+    # 4) RC4 encrypt Blowfish ciphertext
+    rc4 = AdvancedRC4(rc4_key_input)
+    final_ciphertext = rc4.encrypt_decrypt(blowfish_ciphertext)
+
+    # Wrap keys with passphrase-derived wrapping key
+    salt = get_random_bytes(PBKDF2_SALT_LEN)
+    wrapping_key = derive_wrapping_key(passphrase, salt)
+
+    wrapped = {
+        "data_aes_key": wrap_with_aes_gcm(wrapping_key, data_aes_key),
+        "data_iv": wrap_with_aes_gcm(wrapping_key, data_iv),
+        "chacha_key": wrap_with_aes_gcm(wrapping_key, chacha_key),
+        "blowfish_key": wrap_with_aes_gcm(wrapping_key, blowfish_key_input),
+        "rc4_key": wrap_with_aes_gcm(wrapping_key, rc4_key_input),
+    }
+
+    session_struct = {"salt": b64encode(salt).decode(), "wrapped": wrapped}
+    os.makedirs(os.path.dirname(SESSION_FILE), exist_ok=True)
+    with open(SESSION_FILE, "w") as f:
+        json.dump(session_struct, f, indent=2)
+
+    # Save final ciphertext hex
+    os.makedirs(os.path.dirname(CIPHERTEXT_FILE), exist_ok=True)
+    with open(CIPHERTEXT_FILE, "w") as f:
         f.write(final_ciphertext.hex())
-    # === END ORIGINAL LOGIC ===
 
-    # Display final ciphertext in panel
-    console.print(Panel(Text(final_ciphertext.hex(), style="bold bright_green"),
-                        title="[bold cyan]MULTILAYER ENCRYPTION RESULT[/bold cyan]",
-                        border_style="bright_blue", box=ROUNDED))
+    console.print(Panel(Text(final_ciphertext.hex(), style="bold bright_green"), title="[bold cyan]RESULT (hex)[/bold cyan]", border_style="bright_blue"))
 
 
 def multilayer_decrypt_flow():
-    console.print(Panel("RC4 → Blowfish → AES → ChaCha20", title="[bold cyan]MULTILAYER DECRYPTION[/bold cyan]", border_style="bright_blue", box=ROUNDED))
+    console.print(Panel("RC4 → Blowfish → AES-CBC → ChaCha20 (secure patch)", title="[bold cyan]MULTILAYER DECRYPTION[/bold cyan]", border_style="bright_blue", box=ROUNDED))
 
     if not os.path.exists(SESSION_FILE):
         console.print(f"[bold red]ERROR:[/bold red] Session file {SESSION_FILE} not found.")
         return
 
-    key, iv = load_session(SESSION_FILE)
+    passphrase = getpass("[?] Enter passphrase to unlock session: ").strip()
+    if not passphrase:
+        console.print("[bold red]Passphrase required.[/bold red]")
+        return
 
-    # Decrypt Blowfish key
+    # Load wrapped session
+    with open(SESSION_FILE, "r") as f:
+        session_struct = json.load(f)
+
+    salt = b64decode(session_struct["salt"])
+    wrapping_key = derive_wrapping_key(passphrase, salt)
+
     try:
-        encrypted_bf_key = load_blowfish_key(BLOWFISH_KEY_FILE)
-        real_blowfish_key = aes_cbc_decrypt(encrypted_bf_key, key, iv)
+        wrapped = session_struct["wrapped"]
+        data_aes_key = unwrap_with_aes_gcm(wrapping_key, wrapped["data_aes_key"])
+        data_iv = unwrap_with_aes_gcm(wrapping_key, wrapped["data_iv"])
+        chacha_key = unwrap_with_aes_gcm(wrapping_key, wrapped["chacha_key"])
+        blowfish_key_input = unwrap_with_aes_gcm(wrapping_key, wrapped["blowfish_key"])
+        rc4_key_input = unwrap_with_aes_gcm(wrapping_key, wrapped["rc4_key"])
     except Exception as e:
-        console.print(f"[bold red]Failed to decrypt Blowfish key file:[/bold red] {e}")
+        console.print(f"[bold red]Failed to unwrap session keys: {e}[/bold red]")
         return
 
-    # Decrypt RC4 key
-    try:
-        encrypted_rc4_key = open(RC4_KEY_FILE, "rb").read()
-        real_rc4_key = aes_cbc_decrypt(encrypted_rc4_key, key, iv).decode()
-    except Exception as e:
-        console.print(f"[bold red]Failed to decrypt RC4 key file:[/bold red] {e}")
-        return
-
-    # Load ChaCha key
-    try:
-        with open("Source_Code\\all_session\\chacha_key.bin", "rb") as f:
-            chacha_key = f.read()
-    except FileNotFoundError:
-        console.print("[bold red]ERROR:[/bold red] chacha_key.bin missing")
-        return
-
-    blowfish_key_input = real_blowfish_key
-
-    # Ciphertext input
-    user_input = Prompt.ask("[bold green]Paste your ciphertext hex (or press Enter to use ciphertext.hex)[/bold green]").strip()
+    # Get ciphertext hex (ask user or use saved file)
+    user_input = Prompt.ask("[bold green]Paste ciphertext hex (or press Enter to use stored ciphertext.hex)[/bold green]").strip()
     if user_input:
         cthex = user_input
     else:
-        with open("Source_Code\\all_session\\ciphertext.hex", "r") as f:
+        if not os.path.exists(CIPHERTEXT_FILE):
+            console.print(f"[bold red]ERROR:[/bold red] No stored ciphertext file at {CIPHERTEXT_FILE}.")
+            return
+        with open(CIPHERTEXT_FILE, "r") as f:
             cthex = f.read().strip()
 
     try:
         final_ciphertext = bytes.fromhex(cthex)
-    except:
-        console.print("[bold red]Invalid hex.[/bold red]")
+    except Exception:
+        console.print("[bold red]Invalid hex input.[/bold red]")
         return
 
-    # RC4 decryption
+    # RC4 decrypt
     try:
-        rc4_tool = AdvancedRC4(real_rc4_key)
-        blowfish_layer = rc4_tool.encrypt_decrypt(final_ciphertext)
+        rc4 = AdvancedRC4(rc4_key_input)
+        blowfish_layer = rc4.encrypt_decrypt(final_ciphertext)
     except Exception as e:
-        console.print(f"[bold red]RC4 Decryption failed:[/bold red] {e}")
+        console.print(f"[bold red]RC4 decryption failed: {e}[/bold red]")
         return
 
     # Blowfish decrypt
     try:
-        aes_ciphertext = blowfish_decrypt(blowfish_layer, blowfish_key_input)
+        aes_ciphertext = blowfish_decrypt_full(blowfish_layer, blowfish_key_input)
     except Exception as e:
-        console.print(f"[bold red]Blowfish Decryption failed:[/bold red] {e}")
+        console.print(f"[bold red]Blowfish decryption failed: {e}[/bold red]")
         return
 
-    # AES decrypt
+    # AES-CBC decrypt -> gets base64 JSON
     try:
-        decrypted = aes_cbc_decrypt(aes_ciphertext, key, iv)
-        chacha_json = base64_to_json(decrypted.decode())
+        decrypted_b64 = aes_cbc_decrypt(aes_ciphertext, data_aes_key, data_iv)
+        chacha_json = base64.b64decode(decrypted_b64).decode("utf-8")
     except Exception as e:
-        console.print(f"[bold red]AES Decryption failed:[/bold red] {e}")
+        console.print(f"[bold red]AES-CBC decryption failed: {e}[/bold red]")
         return
 
     # ChaCha20 decrypt
     try:
-        plaintext = decrypt_message(chacha_json, chacha_key)
-        if isinstance(plaintext, str) and plaintext.startswith("Decryption failed"):
-            console.print(f"[bold red]{plaintext}[/bold red]")
-            return
+        plaintext = decrypt_message_chacha(chacha_json, chacha_key)
     except Exception as e:
-        console.print(f"[bold red]ChaCha20 Decryption failed:[/bold red] {e}")
+        console.print(f"[bold red]ChaCha20 decryption failed: {e}[/bold red]")
         return
 
-    console.print(Panel(Text(plaintext, style="bold bright_green"),
-                        title="[bold cyan]MULTILAYER DECRYPTION RESULT[/bold cyan]",
-                        border_style="bright_blue", box=ROUNDED))
-    
+    console.print(Panel(Text(plaintext, style="bold bright_green"), title="[bold cyan]DECRYPTED PLAINTEXT[/bold cyan]", border_style="bright_blue"))
 
-# ------------------------------------------------------------
-# Entrypoint / Main
-# ------------------------------------------------------------
+
+# Optional CLI entrypoint
 def main():
-    print("=== AES-256-CBC Encryption Tool ===\n")
+    print("=== Secure multilayer encryption (patched) ===")
     while True:
         print("\nOptions:")
-        print("1. Multilayer Encrypt (ChaCha20 → AES → Blowfish → RC4)")
-        print("2. Multilayer Decrypt (RC4 → Blowfish → AES → ChaCha20)")
+        print("1. Multilayer Encrypt")
+        print("2. Multilayer Decrypt")
         print("3. Exit")
-
-        choice = input("\nEnter your choice (1-3): ").strip()
-        if choice == '1':
+        choice = input("Enter choice: ").strip()
+        if choice == "1":
             multilayer_encrypt_flow()
-        elif choice == '2':
+        elif choice == "2":
             multilayer_decrypt_flow()
-        elif choice == '3':
-            print("Exiting.")
+        elif choice == "3":
             break
         else:
-            print("Invalid choice. Please try again.")
+            print("Invalid choice.")
+
 
 if __name__ == "__main__":
     main()
