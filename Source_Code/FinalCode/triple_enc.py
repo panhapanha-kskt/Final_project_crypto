@@ -1,12 +1,4 @@
-# triple_enc.py
-"""
-Secure multilayer encryption flow (patched).
-
-Replaces custom AES implementation with PyCryptodome AES (CBC for data,
-AES-GCM for key-wrapping) and uses PBKDF2 for deriving a wrapping key from
-a user passphrase. Fixes blowfish key storage, RC4 key storage, and avoids
-saving ChaCha20 key in plaintext.
-
+'''
 Flow (Encrypt):
  1) ChaCha20-Poly1305 -> JSON (nonce,header,ciphertext,tag)
  2) Base64(JSON) -> AES-256-CBC (random data_key + iv)  (data encryption)
@@ -16,12 +8,7 @@ Flow (Encrypt):
 
 Flow (Decrypt):
  Reverse the above using the passphrase to unwrap keys.
-
-Notes:
- - Requires PyCryptodome: pip install pycryptodome
- - Session file contains: salt + wrapped blobs (base64 JSON)
-"""
-
+'''
 import os
 import json
 import base64
@@ -53,6 +40,30 @@ CIPHERTEXT_FILE = "Source_Code\\all_session\\ciphertext.hex"
 
 # RC4 engine (kept from your rc4_addingx module)
 from rc4_addingx import AdvancedRC4
+
+
+# ----------------------------
+# load key helpers
+# ---------------------------
+def load_key_from_file(path: str) -> bytes:
+    """ Detect file extension """
+    extension = os.path.splitext(path)[1].lower()
+    with open(path, "rb") as f:
+        raw = f.read()
+    
+    if extension == ".txt":
+        return raw.decode("utf-8").strip().encode("utf-8")
+    if extension == ".hex":
+        txt = raw.decode("utf-8").strip()
+        return base64.b64decode(txt)
+    if extension in [".b64", ".base64"]:
+        txt = raw.decode("utf-8").strip()
+        return base64.b64decode(txt)
+    if extension in [".bin", ".key"]:
+        return raw
+    
+    #detect as raw text
+    return raw
 
 
 # ---------------------------
@@ -184,7 +195,7 @@ def blowfish_decrypt_full(data: bytes, key: bytes) -> bytes:
 # Multilayer encrypt/decrypt flows with secure wrapping
 # ---------------------------
 def multilayer_encrypt_flow():
-    console.print(Panel("ChaCha20 → AES-CBC → Blowfish → RC4 (secure patch)", title="[bold cyan]MULTILAYER ENCRYPTION[/bold cyan]", border_style="bright_blue", box=ROUNDED))
+    console.print(Panel("ChaCha20 → AES-CBC → Blowfish → RC4 ", title="[bold cyan]MULTILAYER ENCRYPTION[/bold cyan]", border_style="bright_blue", box=ROUNDED))
 
     txt = Prompt.ask("[bold green]Enter plaintext to encrypt[/bold green]")
     if not txt:
@@ -192,19 +203,32 @@ def multilayer_encrypt_flow():
         return
 
     # Blowfish key provided by user (text)
-    blowfish_key_input = Prompt.ask("[bold yellow]Enter Blowfish key (4–56 bytes)[/bold yellow]").encode("utf-8")
-    if len(blowfish_key_input) < 4 or len(blowfish_key_input) > 56:
-        console.print("[bold red]Blowfish key must be between 4 and 56 bytes.[/bold red]")
+    console.print("[bold magenta]User can use multiple keys or the same key for encryption message!![/bold magenta]")
+    blowfish_path = Prompt.ask("Enter path to your key file: ")
+    try:
+        blowfish_key_input = load_key_from_file(blowfish_path)
+    except Exception as e:
+        console.print(f"[bold red]Failed to load your key file: {e}[/bold red]")
         return
+    if len(blowfish_key_input) < 4 or len(blowfish_key_input) > 56:
+        console.print("[bold red]Your key must be between 4 and 56 bytes.[/bold red]")
+        return
+    
 
     # RC4 key provided by user
-    rc4_key_input = Prompt.ask("[bold magenta]Enter RC4 key (min 5 bytes)[/bold magenta]").strip().encode("utf-8")
+    rc4_path = Prompt.ask("Enter path to your key file again: ")
+    try:
+        rc4_key_input = load_key_from_file(rc4_path)
+    except Exception as e:
+        console.print(f"[bold red]Failed to load your key file: {e}[/bold red]")
+        return
+
     if len(rc4_key_input) < 5:
-        console.print("[bold red]RC4 key must be at least 5 bytes.[/bold red]")
+        console.print("[bold red]Your key must be at least 5 bytes.[/bold red]")
         return
 
     # Ask for passphrase that will protect stored session keys (mandatory)
-    console.print("[bold cyan]You will be asked to choose a passphrase to protect stored session keys.[/bold cyan]")
+    console.print("[bold cyan]Enter Passphrase to secure your session keys.[/bold cyan]")
     passphrase = getpass("[?] Enter passphrase for session storage: ").strip()
     if not passphrase:
         console.print("[bold red]Passphrase is required to securely store keys.[/bold red]")
@@ -254,7 +278,7 @@ def multilayer_encrypt_flow():
 
 
 def multilayer_decrypt_flow():
-    console.print(Panel("RC4 → Blowfish → AES-CBC → ChaCha20 (secure patch)", title="[bold cyan]MULTILAYER DECRYPTION[/bold cyan]", border_style="bright_blue", box=ROUNDED))
+    console.print(Panel("RC4 → Blowfish → AES-CBC → ChaCha20", title="[bold cyan]MULTILAYER DECRYPTION[/bold cyan]", border_style="bright_blue", box=ROUNDED))
 
     if not os.path.exists(SESSION_FILE):
         console.print(f"[bold red]ERROR:[/bold red] Session file {SESSION_FILE} not found.")
@@ -281,6 +305,31 @@ def multilayer_decrypt_flow():
         rc4_key_input = unwrap_with_aes_gcm(wrapping_key, wrapped["rc4_key"])
     except Exception as e:
         console.print(f"[bold red]Failed to unwrap session keys: {e}[/bold red]")
+        return
+
+    # Blowfish key provided by user (text)
+    console.print("[bold magenta]User can use multiple keys or the same key for encryption message!![/bold magenta]")
+    blowfish_path_decrypt = Prompt.ask("Enter path to your key file: ")
+    try:
+        blowfish_key_input = load_key_from_file(blowfish_path_decrypt)
+    except Exception as e:
+        console.print(f"[bold red]Failed to load your key file: {e}[/bold red]")
+        return
+    if len(blowfish_key_input) < 4 or len(blowfish_key_input) > 56:
+        console.print("[bold red]Your key must be between 4 and 56 bytes.[/bold red]")
+        return
+    
+
+    # RC4 key provided by user
+    rc4_path_decrypt = Prompt.ask("Enter path to your key file again: ")
+    try:
+        rc4_key_input = load_key_from_file(rc4_path_decrypt)
+    except Exception as e:
+        console.print(f"[bold red]Failed to load your key file: {e}[/bold red]")
+        return
+
+    if len(rc4_key_input) < 5:
+        console.print("[bold red]Your key must be at least 5 bytes.[/bold red]")
         return
 
     # Get ciphertext hex (ask user or use saved file)

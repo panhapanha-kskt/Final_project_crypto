@@ -219,7 +219,7 @@ def main():
 
         elif choice == "L":
             console.print(Panel(Text("\n".join(logs[-200:]) if logs else "No logs yet.", style="green"), title="Recent Logs", border_style="bright_blue"))
-            console.input("\nPress Enter to return to menu...")
+          
 
         elif choice == "C":
             logs.clear()
