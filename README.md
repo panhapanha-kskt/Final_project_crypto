@@ -80,16 +80,16 @@ Meet all individual project assessment requirements
 
 Python Dependencies
 
-Listed in FinalCode/requirements.txt
+Listed in Source_Code/FinalCode/requirements.txt
 
 Install using:
 
-        pip install -r FinalCode/requirements.txt
+        pip install -r Source_Code/FinalCode/requirements.txt
 
 🚀 How to Run
 
-1️⃣ Activate Virtual Environment (optional but recommended)
-
+1️⃣ Activate Virtual Environment
+        python3 -m venv venv
         source venv/bin/activate   # Linux/macOS
         
         venv\Scripts\activate      # Windows
