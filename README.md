@@ -22,6 +22,7 @@ Practice code organization, documentation, and defense
 
 Meet all individual project assessment requirements
 
+
 📊 System Architecture Diagram
 ┌───────────────────────────────────────────────────────────┐
 │                  Multi-Layer Encryption Suite              │
@@ -112,14 +113,14 @@ CIPHERTEXT
    ▼
 PLAINTEXT
 
-
 Algorithm	                Role
-ChaCha20-Poly1305	        Authenticated encryption & integrity
+ChaCha20-Poly1305	          Authenticated encryption & integrity
 AES-256-CBC	                Strong symmetric encryption
-Blowfish-CBC	                Legacy block cipher (educational)
-RC4 (Custom)	                Outer obfuscation layer
-PBKDF2	                        Password-based key derivation
-AES-GCM	                        Secure key wrapping
+Blowfish-CBC	             Legacy block cipher (educational)
+RC4 (Custom)	             Outer obfuscation layer
+PBKDF2	                   Password-based key derivation
+AES-GCM	                   Secure key wrapping
+
 
 🗂️ Project Structure
 Source_Code/
