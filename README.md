@@ -37,19 +37,11 @@ Meet all individual project assessment requirements
 <img width="893" height="337" alt="image" src="https://github.com/user-attachments/assets/cf38f86d-e3a5-41a1-bcac-162ab75d0771" />
 
 
-Algorithm	                Role
+🔐 Cryptographic Algorithms Used
 
-ChaCha20-Poly1305	          Authenticated encryption & integrity
 
-AES-256-CBC	                Strong symmetric encryption
+<img width="874" height="375" alt="image" src="https://github.com/user-attachments/assets/960135cb-2da3-4a9d-b282-757f21d9f262" />
 
-Blowfish-CBC	             Legacy block cipher (educational)
-
-RC4 (Custom)	             Outer obfuscation layer
-
-PBKDF2	                   Password-based key derivation
-
-AES-GCM	                   Secure key wrapping
 
 
 🗂️ Project Structure
