@@ -24,42 +24,8 @@ Meet all individual project assessment requirements
 
 
 📊 System Architecture Diagram
-┌───────────────────────────────────────────────────────────┐
-│                  Multi-Layer Encryption Suite              │
-└───────────────────────────────────────────────────────────┘
+<img width="888" height="1033" alt="image" src="https://github.com/user-attachments/assets/a89a46df-54e1-4767-979c-a9bc195c6016" />
 
-                 ┌───────────────────────┐
-                 │  Rich UI (main.py)    │
-                 │  - Menu System        │
-                 │  - System Info        │
-                 │  - WiFi Scanner       │
-                 │  - Logs Panel         │
-                 └───────────────▲───────┘
-                                 │ Calls
-                 ┌───────────────┴───────────────┐
-                 │       Encryption Engine        │
-                 │        (triple_enc.py)         │
-                 └───────────────┬───────────────┘
-                                 │
-                    ┌────────────┼─────────────┐
-                    │            │             │
-                    ▼            ▼             ▼
-        ┌────────────────┐  ┌──────────────┐  ┌────────────────┐
-        │ ChaCha20 Layer │  │ AES-256-CBC  │  │ Blowfish-CBC   │
-        └────────────────┘  └──────────────┘  └────────────────┘
-                    │            │             │
-                    └────────────┴─────────────┘
-                                 ▼
-                       ┌──────────────────┐
-                       │   RC4 Layer      │
-                       │ (AdvancedRC4)    │
-                       └──────────────────┘
-                                 │
-                                 ▼
-                      ┌─────────────────────┐
-                      │  Saved Session Data │
-                      │   (all_session/)    │
-                      └─────────────────────┘
 
 🔐 Encryption Flow Diagram
 PLAINTEXT
@@ -114,78 +80,73 @@ CIPHERTEXT
 PLAINTEXT
 
 Algorithm	                Role
+
 ChaCha20-Poly1305	          Authenticated encryption & integrity
+
 AES-256-CBC	                Strong symmetric encryption
+
 Blowfish-CBC	             Legacy block cipher (educational)
+
 RC4 (Custom)	             Outer obfuscation layer
+
 PBKDF2	                   Password-based key derivation
+
 AES-GCM	                   Secure key wrapping
 
 
 🗂️ Project Structure
-Source_Code/
-│
-├── all_session/
-│   ├── ciphertext.hex           # Final encrypted output
-│   └── session_wrapped.json     # Wrapped session keys
-│
-├── FinalCode/
-│   ├── __pycache__/
-│   ├── main.py                  # CLI entry point (Rich-based UI)
-│   ├── triple_enc.py            # Core multilayer encryption logic
-│   ├── rc4_addingx.py            # Advanced RC4 implementation
-│   └── requirements.txt         # Python dependencies
-│
-├── step_by_step_code/
-│   ├── __pycache__/
-│   ├── adding_x.py               # Helper utilities
-│   ├── aes_256_mode_cbc.py       # AES-256-CBC implementation
-│   ├── aes_session.json          # AES session data
-│   ├── blowfish.py               # Blowfish cipher
-│   ├── blowfish_key.bin          # Blowfish key storage
-│   ├── chacha_key.bin            # ChaCha20 key storage
-│   ├── chacha_output.json        # AEAD output
-│   ├── chacha_poly1305.py        # ChaCha20-Poly1305 logic
-│   └── ciphertext.hex            # Intermediate ciphertext
-│
-├── venv/                         # Python virtual environment
-├── .gitignore
-├── pyvenv.cfg
-└── README.md
+
+<img width="889" height="849" alt="image" src="https://github.com/user-attachments/assets/41cffcb6-c91d-46c5-a2f4-1ff2bb0c0fb5" />
 
 
 🖥️ Key Features
 
 - Rich-based menu-driven CLI
+
 - Multilayer encryption & decryption
+
 - Secure password-based key derivation
+
 - Session key wrapping with AES-GCM
+
 - Authenticated encryption with tamper detection
+
 - Step-by-step implementation for learning & explanation
+
 - Designed for code defense and viva/Q&A
 
 ⚙️ Installation
 1. Clone the repository
-git clone https://github.com/panhapanha-kskt/Final_project_crypto.git
-cd Final_project_crypto
+    git clone https://github.com/panhapanha-kskt/Final_project_crypto.git
+
+    cd Final_project_crypto
 
 ⚙️ Requirements
 
 - Python 3.9 or newer
+
 - OS: Linux / Windows / macOS
 
 Python Dependencies
+
 Listed in FinalCode/requirements.txt
+
 Install using:
+
         pip install -r FinalCode/requirements.txt
 
 🚀 How to Run
+
 1️⃣ Activate Virtual Environment (optional but recommended)
+
         source venv/bin/activate   # Linux/macOS
+        
         venv\Scripts\activate      # Windows
         
 2️⃣ Run the Main Application
+    
         cd Source_Code/FinalCode
+        
         python3 main.py
         
 3️⃣ Available Options
@@ -193,7 +154,11 @@ Install using:
 
 🔎Security Notes
 - RC4 is used only for academic comparison
+
 - Keys are derived using PBKDF2
+
 - ChaCha20-Poly1305 ensures integrity & authenticity
+
 - AES-GCM protects wrapped session keys
+
 - Demonstrates layered security, not minimal cipher design
