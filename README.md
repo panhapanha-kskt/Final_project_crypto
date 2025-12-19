@@ -1,241 +1,26 @@
-🔐 Multi-Layer Encryption Suite
-Final Individual Project – Cryptography
+<img width="2068" height="1319" alt="image" src="https://github.com/user-attachments/assets/f21c78a9-772b-4e7e-8ad6-93c62d505f91" />🔐 Multilayer Encryption System
 
-A comprehensive cryptographic demonstration tool featuring a four-layer encryption pipeline, a rich terminal UI, live system/WiFi diagnostics, and a standalone RC4 text encryption utility.
+(Educational Cryptography Project)
 
-Designed for education, research, and conceptual understanding of layered cryptography.
+📌 Overview
 
-📘 Purpose of This Tool
+This project implements a multilayer encryption and decryption system to demonstrate defense-in-depth cryptographic design.
+It combines modern authenticated encryption with classic symmetric ciphers, secure key derivation, and session-based key wrapping, all accessible through a CLI-based interface.
 
-This project was developed to help students, researchers, and developers understand:
+⚠️ Academic Disclaimer
+This system is developed strictly for educational purposes and is not intended for real-world production use.
 
-How different cryptographic algorithms behave in a layered environment
+🎯 Project Objectives
 
-How secure communication concepts are modeled in academic settings
+Demonstrate layered cryptographic security
 
-How keys, sessions, and intermediate states are managed
+Compare modern vs legacy encryption algorithms
 
-How encryption pipelines are implemented in practice
+Implement secure key derivation and wrapping
 
-This tool simulates concepts used in sectors such as secure communication research, defense communication studies, and critical data protection — but is not intended for real-world military or production security.
+Practice code organization, documentation, and defense
 
-⚠️ Educational Use Only
-
-This project is intended strictly for:
-
-Learning
-
-Laboratory testing
-
-Simulation
-
-Academic demonstrations
-
-It must not be used to secure real operational, confidential, or military communications.
-
-🚀 Features
-🔹 1. Multi-Layer Encryption Pipeline
-
-The encryption engine applies the following layers sequentially:
-
-ChaCha20-Poly1305
-
-AES-256-CBC
-
-Blowfish-CBC
-
-Advanced RC4 (custom implementation)
-
-Decryption reverses these steps automatically.
-
-🔹 2. Rich Terminal UI (RICH Library)
-
-The UI includes:
-
-Live WiFi and network information
-
-System diagnostics (hostname, IPv4, interface)
-
-Multi-panel layout
-
-Interactive menu
-
-Real-time logs
-
-Encryption/decryption controls
-
-🔹 3. Standalone RC4 CLI Utility
-
-Supports:
-
-Text mode
-
-Hex mode
-
-Python bytes literal (b"\x41\x42...")
-
-Output in: raw, hex, base64, C array (\x00), Python bytes array
-
-File output support via -o
-
-🔹 4. Session & Key Management
-
-Automatically stores:
-
-AES session files
-
-Blowfish keys
-
-ChaCha20 output
-
-RC4 key
-
-Final ciphertext
-
-All of these files are stored in:
-
-Source_Code/all_session/
-
-📁 Project Structure
-D:\YEAR3 TERM1\CRYPTOGRAPHY\FINAL_PROJECT_CRYPTO\SOURCE_CODE
-├── all_session
-│       aes_session.json
-│       blowfish_key.bin
-│       chacha_key.bin
-│       chacha_output.json
-│       ciphertext.hex
-│       rc4_key.bin
-│
-├── FinalCode
-│   │   main.py
-│   │   rc4_addingx.py
-│   │   triple_enc.py
-│   │
-│   └── __pycache__
-│           main.cpython-314.pyc
-│           rc4_addingx.cpython-314.pyc
-│           triple_enc.cpython-314.pyc
-│
-└── step_by_step_code_combination
-        adding_x.py
-        aes_256_mode_cbc.py
-        aes_session.json
-        blowfish.py
-        blowfish_key.bin
-        chacha_key.bin
-        chacha_output.json
-        chacha_poly1305.py
-        ciphertext.hex
-
-⚙️ Installation
-1. Clone the repository
-git clone https://github.com/panhapanha-kskt/Final_project_crypto.git
-cd Final_project_crypto
-
-2. Create virtual environment
-python3 -m venv venv
-
-3. Activate virtual environment
-
-Windows:
-
-venv\Scripts\activate
-
-
-Linux/macOS:
-
-source venv/bin/activate
-
-4. Install dependencies
-cd Source_Code/FinalCode
-pip install -r requirements.txt
-
-▶️ Running the Main Program (Rich UI)
-python3 Source_Code/FinalCode/main.py
-
-
-You will see:
-
-System info
-
-WiFi info
-
-Encryption menu
-
-Logs panel
-
-🧨 Using the Multi-Layer Encryption Tool
-1. Encrypt
-
-Select:
-
-[1] Multilayer Encryption (ChaCha20 → AES → Blowfish → RC4)
-
-
-You will be asked:
-
-Enter plaintext:
-
-
-When done, the tool automatically saves:
-
-Keys
-
-Ciphertext
-
-Intermediate output files
-
-Stored in all_session/.
-
-2. Decrypt
-
-Select:
-
-[2] Multilayer Decryption (RC4 → Blowfish → AES → ChaCha20)
-
-
-The tool loads data from all_session/ and restores the original plaintext.
-
-💡 RC4 Standalone CLI Usage
-Encrypt
-python rc4_addingx.py -m encrypt -k "password123" -i "hello"
-
-Decrypt
-python rc4_addingx.py -m decrypt -k "password123" -i "5a1f9e..."
-
-Supports:
-
-Raw text
-
-Hex strings
-
-Python bytes (b"\x41\x42\x43")
-
-Saving to file (-o output.bin)
-
-📚 Technical Summary
-🔒 Encryption Order (Encrypt Mode)
-Plaintext
-   ↓
-ChaCha20-Poly1305
-   ↓
-AES-256-CBC
-   ↓
-Blowfish-CBC
-   ↓
-Advanced RC4
-   ↓
-ciphertext.hex
-
-🔓 Decryption Order (Decrypt Mode)
-RC4 → Blowfish → AES → ChaCha20
-
-⚠️ Important Notes
-
-✔ Keys and intermediate results are stored automatically
-✔ Do NOT delete all_session/ if you want decryption to work
-✔ RC4 tool is separate from multilayer pipeline
-✔ This project is for education and research only
+Meet all individual project assessment requirements
 
 📊 System Architecture Diagram
 ┌───────────────────────────────────────────────────────────┐
@@ -327,33 +112,87 @@ CIPHERTEXT
    ▼
 PLAINTEXT
 
-🧩 RC4 Standalone Tool Diagram
-INPUT TEXT / HEX / PY BYTES
-        │
-        ▼
-┌───────────────┐
-│  KSA (Keying) │
-└───────────────┘
-        │
-        ▼
-┌───────────────┐
-│ PRGA (Stream) │
-└───────────────┘
-        │
-        ▼
-┌───────────────┐
-│   XOR Stage   │
-└───────────────┘
-        │
-        ▼
- OUTPUT (hex/raw/base64/etc.)
 
-📂 Session Files Diagram
-all_session/
+Algorithm	                Role
+ChaCha20-Poly1305	        Authenticated encryption & integrity
+AES-256-CBC	                Strong symmetric encryption
+Blowfish-CBC	                Legacy block cipher (educational)
+RC4 (Custom)	                Outer obfuscation layer
+PBKDF2	                        Password-based key derivation
+AES-GCM	                        Secure key wrapping
+
+🗂️ Project Structure
+Source_Code/
 │
-├── aes_session.json
-├── blowfish_key.bin
-├── chacha_key.bin
-├── chacha_output.json
-├── ciphertext.hex
-└── rc4_key.bin
+├── all_session/
+│   ├── ciphertext.hex           # Final encrypted output
+│   └── session_wrapped.json     # Wrapped session keys
+│
+├── FinalCode/
+│   ├── __pycache__/
+│   ├── main.py                  # CLI entry point (Rich-based UI)
+│   ├── triple_enc.py            # Core multilayer encryption logic
+│   ├── rc4_addingx.py            # Advanced RC4 implementation
+│   └── requirements.txt         # Python dependencies
+│
+├── step_by_step_code/
+│   ├── __pycache__/
+│   ├── adding_x.py               # Helper utilities
+│   ├── aes_256_mode_cbc.py       # AES-256-CBC implementation
+│   ├── aes_session.json          # AES session data
+│   ├── blowfish.py               # Blowfish cipher
+│   ├── blowfish_key.bin          # Blowfish key storage
+│   ├── chacha_key.bin            # ChaCha20 key storage
+│   ├── chacha_output.json        # AEAD output
+│   ├── chacha_poly1305.py        # ChaCha20-Poly1305 logic
+│   └── ciphertext.hex            # Intermediate ciphertext
+│
+├── venv/                         # Python virtual environment
+├── .gitignore
+├── pyvenv.cfg
+└── README.md
+
+
+🖥️ Key Features
+
+- Rich-based menu-driven CLI
+- Multilayer encryption & decryption
+- Secure password-based key derivation
+- Session key wrapping with AES-GCM
+- Authenticated encryption with tamper detection
+- Step-by-step implementation for learning & explanation
+- Designed for code defense and viva/Q&A
+
+⚙️ Installation
+1. Clone the repository
+git clone https://github.com/panhapanha-kskt/Final_project_crypto.git
+cd Final_project_crypto
+
+⚙️ Requirements
+
+- Python 3.9 or newer
+- OS: Linux / Windows / macOS
+
+Python Dependencies
+Listed in FinalCode/requirements.txt
+Install using:
+        pip install -r FinalCode/requirements.txt
+
+🚀 How to Run
+1️⃣ Activate Virtual Environment (optional but recommended)
+        source venv/bin/activate   # Linux/macOS
+        venv\Scripts\activate      # Windows
+        
+2️⃣ Run the Main Application
+        cd Source_Code/FinalCode
+        python3 main.py
+        
+3️⃣ Available Options
+<img width="2068" height="1319" alt="Screenshot 2025-12-20 001824" src="https://github.com/user-attachments/assets/65912b7f-3d9c-45c8-ab2f-e19bd116b9eb" />
+
+🔎Security Notes
+- RC4 is used only for academic comparison
+- Keys are derived using PBKDF2
+- ChaCha20-Poly1305 ensures integrity & authenticity
+- AES-GCM protects wrapped session keys
+- Demonstrates layered security, not minimal cipher design
