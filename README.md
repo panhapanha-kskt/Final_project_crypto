@@ -28,56 +28,14 @@ Meet all individual project assessment requirements
 
 
 🔐 Encryption Flow Diagram
-PLAINTEXT
-   │
-   ▼
-┌────────────────────┐
-│  ChaCha20-Poly1305 │
-└────────────────────┘
-   │
-   ▼
-┌────────────────────┐
-│    AES-256-CBC     │
-└────────────────────┘
-   │
-   ▼
-┌────────────────────┐
-│    Blowfish-CBC    │
-└────────────────────┘
-   │
-   ▼
-┌────────────────────┐
-│        RC4          │
-└────────────────────┘
-   │
-   ▼
- FINAL HEX CIPHERTEXT
+
+<img width="883" height="346" alt="image" src="https://github.com/user-attachments/assets/f4444533-80d5-465e-ba1e-c04a56dfa7d6" />
+
 
 🔓 Decryption Flow Diagram
-CIPHERTEXT
-   │
-   ▼
-┌────────────────────┐
-│        RC4          │
-└────────────────────┘
-   │
-   ▼
-┌────────────────────┐
-│    Blowfish-CBC    │
-└────────────────────┘
-   │
-   ▼
-┌────────────────────┐
-│    AES-256-CBC     │
-└────────────────────┘
-   │
-   ▼
-┌────────────────────┐
-│  ChaCha20-Poly1305 │
-└────────────────────┘
-   │
-   ▼
-PLAINTEXT
+
+<img width="893" height="337" alt="image" src="https://github.com/user-attachments/assets/cf38f86d-e3a5-41a1-bcac-162ab75d0771" />
+
 
 Algorithm	                Role
 
@@ -117,6 +75,7 @@ AES-GCM	                   Secure key wrapping
 
 ⚙️ Installation
 1. Clone the repository
+
     git clone https://github.com/panhapanha-kskt/Final_project_crypto.git
 
     cd Final_project_crypto
