@@ -89,7 +89,10 @@ Install using:
 🚀 How to Run
 
 1️⃣ Activate Virtual Environment
+
+
         python3 -m venv venv
+        
         source venv/bin/activate   # Linux/macOS
         
         venv\Scripts\activate      # Windows
@@ -101,9 +104,11 @@ Install using:
         python3 main.py
         
 3️⃣ Available Options
+
 <img width="2068" height="1319" alt="Screenshot 2025-12-20 001824" src="https://github.com/user-attachments/assets/65912b7f-3d9c-45c8-ab2f-e19bd116b9eb" />
 
 🔎Security Notes
+
 - RC4 is used only for academic comparison
 
 - Keys are derived using PBKDF2
